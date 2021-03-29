@@ -1,0 +1,254 @@
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:async/async.dart';
+import 'package:rooster/classes.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:week_of_year/week_of_year.dart';
+
+
+class RoosterOverview extends StatefulWidget {
+  @override
+  _RoosterOverviewState createState() => _RoosterOverviewState();
+}
+
+
+
+class _RoosterOverviewState extends State<RoosterOverview> with WidgetsBindingObserver {
+
+  WebViewController _controllerRooster;
+
+  bool thisWeekButton = true;
+
+  var _getClassName = AsyncMemoizer();
+
+  @override
+  void initState() {
+    super.initState();
+    // loadRooster();
+  }
+
+
+
+  @override
+  void dispose() {
+
+    super.dispose();
+  }
+
+  loadRooster() async {
+
+    final storage = new FlutterSecureStorage();
+    var class_index = await storage.read(key: "class_index");
+    var weekNumber = (DateTime.now().weekOfYear).toString();
+
+    // print("https://roosters.rocmondriaan.nl/TIN/ICT/$weekNumber/c/$class_index.htm");
+
+    _controllerRooster.loadUrl("https://roosters.rocmondriaan.nl/TIN/ICT/$weekNumber/c/$class_index.htm");
+
+  }
+
+
+  switchWeek(String thisWeek) async {
+
+    final storage = new FlutterSecureStorage();
+    var class_index = await storage.read(key: "class_index");
+
+    var tempWeekNumber = DateTime.now().weekOfYear;
+
+    if(thisWeek == "false"){
+      tempWeekNumber++;
+    }
+
+    setState(() {
+      thisWeekButton = thisWeek == "true";
+    });
+
+    var weekNumber = tempWeekNumber.toString();
+
+    _controllerRooster.loadUrl("https://roosters.rocmondriaan.nl/TIN/ICT/$weekNumber/c/$class_index.htm");
+
+  }
+
+  resetClass() async {
+
+    final storage = new FlutterSecureStorage();
+    await storage.deleteAll();
+
+    Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(
+        builder: (BuildContext context) => ClassesOverview()), (Route<dynamic> route) => false);
+
+  }
+
+  _fetchClassName() async {
+    return this._getClassName.runOnce(() async {
+      try {
+        final storage = new FlutterSecureStorage();
+        var className = await storage.read(key: "class_name");
+        return className;
+      } catch (e) {
+        return "Rooster";
+      }
+    });
+
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // This method is rerun every time setState is called, for instance as done
+    // by the _incrementCounter method above.
+    //
+    // The Flutter framework has been optimized to make rerunning build methods
+    // fast, so that you can just rebuild anything that needs updating rather
+    // than having to individually change instances of widgets.
+    return Scaffold(
+      appBar:  AppBar(
+        actions: <Widget>[
+          IconButton(
+              icon: Icon(Icons.exit_to_app),
+              onPressed: () {
+                resetClass();
+              }
+            ),
+        ],
+        // Here we take the value from the MyHomePage object that was created by
+        // the App.build method, and use it to set our appbar title.
+        backgroundColor: Colors.black,
+        title: FutureBuilder<dynamic>(
+            future: _fetchClassName(),
+            builder:
+                (BuildContext context, AsyncSnapshot snapshot) {
+              if (snapshot.connectionState ==
+                  ConnectionState.done) {
+                return Text(
+                 snapshot.data,
+                );
+              } else {
+                return Text(
+                  "Rooster",
+                );
+              }
+            }),
+
+      ),
+      backgroundColor: Colors.white,
+      body: Container(
+        // decoration: BoxDecoration(
+        //   // image: DecorationImage(
+        //   //   image: AssetImage("assets/images/SimpleTicket_bg.jpg"),
+        //   //   fit: BoxFit.cover,
+        //   // ),
+        //   color: Colors.black,
+        // ),
+        child: SizedBox.expand(
+          child: Column(
+            children: <Widget>[
+
+              Container(
+                width: MediaQuery.of(context).size.width / 1.15,
+                margin: EdgeInsets.only(
+                  top: 10.0,
+                  bottom: 10.0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 10,
+                      child:
+
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),),
+                          backgroundColor: thisWeekButton ? Colors.blue : Colors.grey,
+                          padding: EdgeInsets.all(15.0),
+                        ),
+                        onPressed: () {
+                          switchWeek("true");
+                        },
+                        child: AutoSizeText(
+                            'Deze Week',
+                            maxLines: 1,
+                            minFontSize: 1,
+                            style: TextStyle(
+                              fontSize: 20.0,
+                              color: Colors.white,
+                            ),
+                        ),
+
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: SizedBox.shrink(),
+                    ),
+                    Expanded(
+                      flex: 10,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),),
+                          backgroundColor: !thisWeekButton ? Colors.blue : Colors.grey,
+                          padding: EdgeInsets.all(15.0),
+                        ),
+                        onPressed: () {
+                          switchWeek("false");
+                        },
+                        child: AutoSizeText(
+                            'Volgende Week',
+                            maxLines: 1,
+                            minFontSize: 1,
+                            style: TextStyle(
+                                fontSize: 20.0,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)
+                        ),
+
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Expanded(
+                child: WebView(
+                  javascriptMode: JavascriptMode.unrestricted,
+                  initialUrl: '',
+                  onWebViewCreated: (WebViewController webViewController) {
+                    _controllerRooster = webViewController;
+                    loadRooster();
+                  },
+                  initialMediaPlaybackPolicy: AutoMediaPlaybackPolicy.always_allow,
+                  gestureNavigationEnabled: true,
+                  onPageFinished: (String url) {
+                    _controllerRooster.evaluateJavascript(
+                            "function checkOverFlow(element) {"
+                              "return element.scrollWidth > element.clientWidth;"
+                            "}"
+                            "var procent = 100;"
+                            "function doSomething(){"
+                              "if(checkOverFlow(document.body)){"
+                                "procent--;"
+                                "console.log(procent);"
+                                "document.body.style.zoom = procent+'%';"
+                                "doSomething();"
+                              "}"
+                            "}"
+                            "doSomething();"
+                        );
+                  },
+
+                ),
+              ),
+
+
+
+            ],
+          ),
+        ),
+
+
+
+      ),
+    );
+  }
+}
